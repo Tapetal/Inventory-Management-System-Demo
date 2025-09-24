@@ -20,9 +20,9 @@ body {
   box-sizing: border-box;
 }
 
-/* Custom styles for better UX */
+/* Custom styles for better UX - Replace @apply with regular CSS */
 .table-row-hover:hover {
-  @apply bg-gray-50;
+  background-color: #f9fafb;
 }
 
 /* Loading animation */
