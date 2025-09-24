@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Reset for consistent sizing across environments */
 html {
@@ -20,9 +18,9 @@ body {
   box-sizing: border-box;
 }
 
-/* Custom styles for better UX - Replace @apply with regular CSS */
+/* Custom styles for better UX */
 .table-row-hover:hover {
-  background-color: #f9fafb;
+  @apply bg-gray-50;
 }
 
 /* Loading animation */
