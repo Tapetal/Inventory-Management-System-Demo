@@ -92,3 +92,23 @@ input[type="number"],
 select {
   font-size: 16px !important;
 }
+
+/* Force consistent rendering across hosting platforms */
+@media screen {
+  html {
+    font-size: 16px !important;
+  }
+  
+  body {
+    font-size: 1rem !important;
+    zoom: 1 !important;
+  }
+}
+
+/* Prevent mobile browser zoom */
+@supports (-webkit-touch-callout: none) {
+  html {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100% !important;
+  }
+}
