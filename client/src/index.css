@@ -9,6 +9,7 @@ html {
   text-size-adjust: none !important;
   zoom: 1 !important;
   transform: scale(1) !important;
+  scroll-behavior: auto; /* Override smooth scrolling for instant resets */
 }
 
 body {
@@ -18,6 +19,7 @@ body {
   margin: 0 !important;
   padding: 0 !important;
   zoom: 1 !important;
+  -ms-scroll-translation: manual;
   transform: scale(1) !important;
   -webkit-text-size-adjust: none !important;
 }
