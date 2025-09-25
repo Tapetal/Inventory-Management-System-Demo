@@ -284,7 +284,7 @@ const InventoryDemo: React.FC = () => {
     </header>
   );
 
-  // New Transaction Modal (Updated for mobile)
+  // FIXED: New Transaction Modal with proper centering
   const NewTransactionModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
     const [formData, setFormData] = useState({
       itemId: '',
@@ -350,8 +350,8 @@ const InventoryDemo: React.FC = () => {
     if (!isOpen) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-2">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto my-4 relative">
           {showSuccess ? (
             <div className="p-6 sm:p-8 text-center">
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -389,10 +389,10 @@ const InventoryDemo: React.FC = () => {
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Date</label>
                   <input
-                    type="date"
-                    value={new Date().toISOString().split('T')[0]}
+                    type="text"
+                    value={new Date().toLocaleDateString()}
                     disabled
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-100"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
                   />
                 </div>
 
@@ -667,20 +667,28 @@ const InventoryDemo: React.FC = () => {
               ))}
             </select>
 
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Start Date"
-            />
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="End Date"
-            />
+            {/* FIXED: Better date inputs with labels */}
+            <div className="relative">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                title="Start Date"
+              />
+              <label className="absolute -top-2 left-2 bg-white px-1 text-xs text-gray-500">Start Date</label>
+            </div>
+            
+            <div className="relative">
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                title="End Date"
+              />
+              <label className="absolute -top-2 left-2 bg-white px-1 text-xs text-gray-500">End Date</label>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -815,7 +823,7 @@ const InventoryDemo: React.FC = () => {
     );
   };
 
-  // Generate Report Component with scroll reset
+  // Generate Report Component with scroll reset and FIXED date inputs
   const GenerateReport = () => {
     const [selectedItem, setSelectedItem] = useState('all');
     const [startDate, setStartDate] = useState('');
