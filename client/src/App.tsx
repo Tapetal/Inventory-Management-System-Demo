@@ -83,19 +83,34 @@ const generateMockTransactions = (): Transaction[] => {
 
 const InventoryDemo: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentView] = useState<'main' | 'view-records' | 'generate-report' | 'inventory-summary'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'view-records' | 'generate-report' | 'inventory-summary'>('main');
   const [showNewTransactionModal, setShowNewTransactionModal] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [items] = useState<Item[]>(mockItems);
   const [loading, setLoading] = useState(true);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginLoading, setLoginLoading] = useState(false);
-  // const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Add scroll reset effect for view changes
+  useEffect(() => {
+    // Scroll to top whenever view changes
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  }, [currentView]);
+
+  // Add initial scroll reset effect
+  useEffect(() => {
+    // Force scroll to top on component mount/page load
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+    }, 100);
+  }, []);
 
   useEffect(() => {
     setTimeout(() => {
       setTransactions(generateMockTransactions());
       setLoading(false);
+      // Ensure we're at top after loading
+      window.scrollTo(0, 0);
     }, 1000);
   }, []);
 
@@ -106,11 +121,24 @@ const InventoryDemo: React.FC = () => {
     setTimeout(() => {
       if (loginForm.email === 'admin@gmail.com' && loginForm.password === 'Admin@1234') {
         setIsAuthenticated(true);
+        // Scroll to top after login
+        setTimeout(() => window.scrollTo(0, 0), 100);
       } else {
         alert('Invalid credentials. Use: admin@gmail.com / Admin@1234');
       }
       setLoginLoading(false);
     }, 1000);
+  };
+
+  // Enhanced view change function with scroll reset
+  const changeView = (newView: typeof currentView) => {
+    setCurrentView(newView);
+    // Force immediate scroll to top
+    window.scrollTo(0, 0);
+    // Also use smooth scroll as backup
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 50);
   };
 
   const getDailyStats = () => {
@@ -240,7 +268,11 @@ const InventoryDemo: React.FC = () => {
               <span className="hidden md:inline">admin@gmail.com</span>
             </div>
             <button
-              onClick={() => setIsAuthenticated(false)}
+              onClick={() => {
+                setIsAuthenticated(false);
+                setCurrentView('main');
+                setTimeout(() => window.scrollTo(0, 0), 100);
+              }}
               className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all text-sm"
             >
               <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -319,23 +351,23 @@ const InventoryDemo: React.FC = () => {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-2">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-2">
           {showSuccess ? (
-            <div className="p-4 sm:p-6 text-center">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Check className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+            <div className="p-6 sm:p-8 text-center">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Transaction Added Successfully!</h3>
-              <div className="flex space-x-2">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Transaction Added Successfully!</h3>
+              <div className="flex space-x-3">
                 <button
                   onClick={() => setShowSuccess(false)}
-                  className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 text-xs sm:text-sm"
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm sm:text-base"
                 >
                   Add More
                 </button>
                 <button
                   onClick={() => { setShowSuccess(false); onClose(); }}
-                  className="flex-1 bg-gray-600 text-white py-2 px-3 rounded-lg hover:bg-gray-700 text-xs sm:text-sm"
+                  className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 text-sm sm:text-base"
                 >
                   Done
                 </button>
@@ -343,29 +375,29 @@ const InventoryDemo: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-900">New Transaction</h2>
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">New Transaction</h2>
                 <button
                   onClick={onClose}
-                  className="p-1 hover:bg-gray-100 rounded-lg"
+                  className="p-2 hover:bg-gray-100 rounded-lg"
                 >
-                  <X className="w-4 h-4 text-gray-500" />
+                  <X className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-3 sm:p-4 space-y-2 sm:space-y-3">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Date</label>
                   <input
                     type="date"
                     value={new Date().toISOString().split('T')[0]}
                     disabled
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md bg-gray-100"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-100"
                   />
                 </div>
 
                 <div className="relative">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Item</label>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Item</label>
                   <input
                     type="text"
                     value={itemSearch}
@@ -375,13 +407,13 @@ const InventoryDemo: React.FC = () => {
                       setFormData({...formData, itemId: ''});
                     }}
                     onFocus={() => setShowDropdown(true)}
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Search items..."
                     required
                   />
                   
                   {showDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-24 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-32 sm:max-h-48 overflow-y-auto">
                       {filteredItems.map(item => (
                         <div
                           key={item._id}
@@ -390,7 +422,7 @@ const InventoryDemo: React.FC = () => {
                             setFormData({...formData, itemId: item._id});
                             setShowDropdown(false);
                           }}
-                          className="px-2 py-1.5 hover:bg-blue-50 cursor-pointer text-xs"
+                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-xs sm:text-sm"
                         >
                           {item.name}
                         </div>
@@ -400,38 +432,38 @@ const InventoryDemo: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Stock In</label>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Stock In</label>
                   <input
                     type="number"
                     min="0"
                     step="1"
                     value={formData.stockIn}
                     onChange={(e) => setFormData({...formData, stockIn: e.target.value})}
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Stock Out</label>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Stock Out</label>
                   <input
                     type="number"
                     min="0"
                     step="1"
                     value={formData.stockOut}
                     onChange={(e) => setFormData({...formData, stockOut: e.target.value})}
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="0"
                   />
                 </div>
 
                 {parseInt(formData.stockOut) > 0 && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Requesting Unit</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Requesting Unit</label>
                     <select
                       value={formData.requestingUnit}
                       onChange={(e) => setFormData({...formData, requestingUnit: e.target.value})}
-                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       required
                     >
                       <option value="">Select requesting unit...</option>
@@ -442,19 +474,19 @@ const InventoryDemo: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex space-x-2 pt-2">
+                <div className="flex space-x-3 pt-2 sm:pt-4">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="flex-1 bg-gray-300 text-gray-700 py-1.5 px-3 rounded-md hover:bg-gray-400 text-xs"
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 text-sm sm:text-base"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 bg-blue-600 text-white py-1.5 px-3 rounded-md hover:bg-blue-700 text-xs"
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm sm:text-base"
                   >
-                    <Plus className="w-3 h-3 inline mr-1" />
+                    <Plus className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Add Transaction</span>
                     <span className="sm:hidden">Add</span>
                   </button>
@@ -470,10 +502,6 @@ const InventoryDemo: React.FC = () => {
   // Main Dashboard (Updated for mobile)
   const MainDashboard = () => {
     const dailyStats = getDailyStats();
-
-    function changeView(_arg0: string) {
-      throw new Error('Function not implemented.');
-    }
 
     return (
       <div className="space-y-4 sm:space-y-8">
@@ -556,9 +584,7 @@ const InventoryDemo: React.FC = () => {
     );
   };
 
-  // Rest of the components would continue with similar responsive improvements...
-  // For brevity, I'll show the ViewRecords component as another example
-
+  // ViewRecords with scroll reset
   const ViewRecords = () => {
     const [search, setSearch] = useState('');
     const [selectedItem, setSelectedItem] = useState('all');
@@ -591,10 +617,6 @@ const InventoryDemo: React.FC = () => {
     };
 
     const groupedTransactions = groupTransactionsByDate();
-
-    function changeView(_arg0: string): void {
-      throw new Error('Function not implemented.');
-    }
 
     return (
       <div className="space-y-4 sm:space-y-6">
@@ -793,7 +815,7 @@ const InventoryDemo: React.FC = () => {
     );
   };
 
-  // Generate Report Component (Mobile Optimized)
+  // Generate Report Component with scroll reset
   const GenerateReport = () => {
     const [selectedItem, setSelectedItem] = useState('all');
     const [startDate, setStartDate] = useState('');
@@ -841,16 +863,16 @@ const InventoryDemo: React.FC = () => {
       setTimeout(() => {
         setReportData(report);
         setReportLoading(false);
+        // Scroll to show the generated report
+        setTimeout(() => {
+          window.scrollTo({ top: 200, behavior: 'smooth' });
+        }, 100);
       }, 1000);
     };
 
     const exportReport = (format: 'pdf' | 'excel') => {
       alert(`${format.toUpperCase()} export functionality would be implemented with backend API calls in the full version. This demo shows the UI and data structure.`);
     };
-
-    function changeView(_arg0: string): void {
-      throw new Error('Function not implemented.');
-    }
 
     return (
       <div className="space-y-4 sm:space-y-6">
@@ -1018,13 +1040,9 @@ const InventoryDemo: React.FC = () => {
     );
   };
 
-  // Inventory Summary Component (Mobile Optimized)
+  // Inventory Summary Component with scroll reset
   const InventorySummary = () => {
     const inventorySummary = getInventorySummary();
-
-    function changeView(_arg0: string): void {
-      throw new Error('Function not implemented.');
-    }
 
     return (
       <div className="space-y-4 sm:space-y-6">
