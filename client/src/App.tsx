@@ -1,22 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Eye, FileText, TrendingUp, Search, Filter, ArrowLeft, Download, BarChart3, X, Plus, Check, LogOut, User } from 'lucide-react';
+import { Package, Eye, FileText, TrendingUp, Search, Filter, ArrowLeft, Download, BarChart3, X, Plus, Check, LogOut, User, Users, ClipboardList, AlertCircle, UserPlus, Mail, Shield, CheckCircle, XCircle } from 'lucide-react';
 
-interface Item {
+// Type Definitions
+interface MockUser {
+  id: string;
+  email: string;
+  role: 'admin' | 'staff';
+  isActive: boolean;
+  lastLogin: string;
+  createdAt: string;
+}
+
+interface MockItem {
   _id: string;
   name: string;
-  description?: string;
+  description: string;
+  lowStockThreshold: number;
+  stockStatus: string;
 }
 
 interface Transaction {
   _id: string;
   date: string;
-  itemId: Item;
+  itemId: MockItem;
   deposit: number;
   withdrawal: number;
   balance: number;
   unit?: string;
+  createdBy: MockUser;
+  isDeleted: boolean;
   createdAt: string;
-  updatedAt: string;
+}
+
+interface DeletionRequest {
+  _id: string;
+  recordType: string;
+  requestedBy: MockUser;
+  reason: string;
+  status: string;
+  requestedAt: string;
 }
 
 interface ReportData {
@@ -27,33 +49,40 @@ interface ReportData {
     finalBalance: number;
     transactionCount: number;
   };
-  itemSummary: Record<string, {
-    deposits: number;
-    withdrawals: number;
-    transactions: number;
-  }>;
 }
 
-const mockItems: Item[] = [
-  { _id: '1', name: 'Office Supplies', description: 'General office supplies and stationery' },
-  { _id: '2', name: 'Computer Equipment', description: 'Computers, laptops, monitors, etc.' },
-  { _id: '3', name: 'Furniture', description: 'Office furniture and fixtures' },
-  { _id: '4', name: 'Documents', description: 'Important documents and files' },
-  { _id: '5', name: 'Safety Equipment', description: 'Safety gear and equipment' },
-  { _id: '6', name: 'Cleaning Supplies', description: 'Cleaning materials and equipment' }
+interface InventorySummaryItem {
+  totalQuantity: number;
+  status: string;
+}
+
+// Mock Users
+const mockUsers: MockUser[] = [
+  { id: '1', email: 'admin@gmail.com', role: 'admin', isActive: true, lastLogin: '2024-01-15T10:30:00', createdAt: '2024-01-01' },
+  { id: '2', email: 'staff1@gmail.com', role: 'staff', isActive: true, lastLogin: '2024-01-14T15:20:00', createdAt: '2024-01-02' },
+  { id: '3', email: 'staff2@gmail.com', role: 'staff', isActive: true, lastLogin: '2024-01-13T09:15:00', createdAt: '2024-01-03' },
 ];
 
-const generateMockTransactions = (): Transaction[] => {
+// Mock Items
+const mockItems: MockItem[] = [
+  { _id: '1', name: 'Office Supplies', description: 'Pens, papers, staplers', lowStockThreshold: 10, stockStatus: 'normal' },
+  { _id: '2', name: 'Computer Equipment', description: 'Laptops, monitors', lowStockThreshold: 5, stockStatus: 'low' },
+  { _id: '3', name: 'Furniture', description: 'Desks, chairs', lowStockThreshold: 3, stockStatus: 'normal' },
+  { _id: '4', name: 'Safety Equipment', description: 'Fire extinguishers', lowStockThreshold: 8, stockStatus: 'out' },
+];
+
+// Generate Mock Transactions
+const generateMockTransactions = (items: MockItem[], users: MockUser[]): Transaction[] => {
   const transactions: Transaction[] = [];
   const units = ['ADMIN', 'ICT', 'FINANCE', 'OPERATIONS', 'PUBLIC RELATION', 'CLEANERS', 'DRIVERS'];
   
-  mockItems.forEach((item, itemIndex) => {
-    let balance = 0;
+  items.forEach((item, itemIndex) => {
+    let balance = itemIndex === 3 ? 0 : Math.floor(Math.random() * 30) + 10;
     const numTransactions = Math.floor(Math.random() * 8) + 5;
     
     for (let i = 0; i < numTransactions; i++) {
       const isDeposit = Math.random() > 0.4;
-      const amount = Math.floor(Math.random() * 50) + 1;
+      const amount = Math.floor(Math.random() * 20) + 1;
       
       const deposit = isDeposit ? amount : 0;
       const withdrawal = !isDeposit ? Math.min(amount, balance) : 0;
@@ -72,8 +101,9 @@ const generateMockTransactions = (): Transaction[] => {
         withdrawal,
         balance,
         unit: withdrawal > 0 ? units[Math.floor(Math.random() * units.length)] : undefined,
-        createdAt: transactionDate.toISOString(),
-        updatedAt: transactionDate.toISOString()
+        createdBy: users[Math.floor(Math.random() * users.length)],
+        isDeleted: false,
+        createdAt: transactionDate.toISOString()
       });
     }
   });
@@ -81,70 +111,74 @@ const generateMockTransactions = (): Transaction[] => {
   return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 
-const InventoryDemo: React.FC = () => {
+const mockDeletionRequests: DeletionRequest[] = [
+  {
+    _id: '1',
+    recordType: 'Transaction',
+    requestedBy: mockUsers[1],
+    reason: 'Duplicate entry - this transaction was recorded twice by mistake',
+    status: 'pending',
+    requestedAt: new Date(Date.now() - 86400000).toISOString()
+  },
+  {
+    _id: '2',
+    recordType: 'Transaction',
+    requestedBy: mockUsers[2],
+    reason: 'Wrong item selected - should have been Office Supplies not Computer Equipment',
+    status: 'pending',
+    requestedAt: new Date(Date.now() - 172800000).toISOString()
+  }
+];
+
+export default function NSCInventoryDemo() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentView, setCurrentView] = useState<'main' | 'view-records' | 'generate-report' | 'inventory-summary'>('main');
+  const [currentUser, setCurrentUser] = useState<MockUser | null>(null);
+  const [currentView, setCurrentView] = useState('main');
   const [showNewTransactionModal, setShowNewTransactionModal] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [items] = useState<Item[]>(mockItems);
+  const [items] = useState<MockItem[]>(mockItems);
+  const [users] = useState<MockUser[]>(mockUsers);
+  const [deletionRequests] = useState<DeletionRequest[]>(mockDeletionRequests);
   const [loading, setLoading] = useState(true);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Add scroll reset effect for view changes
-  useEffect(() => {
-    // Scroll to top whenever view changes
-    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-  }, [currentView]);
-
-  // Add initial scroll reset effect
-  useEffect(() => {
-    // Force scroll to top on component mount/page load
-    setTimeout(() => {
-      window.scrollTo(0, 0);
-    }, 100);
-  }, []);
-
   useEffect(() => {
     setTimeout(() => {
-      setTransactions(generateMockTransactions());
+      setTransactions(generateMockTransactions(mockItems, mockUsers));
       setLoading(false);
-      // Ensure we're at top after loading
-      window.scrollTo(0, 0);
     }, 1000);
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentView]);
+
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
     
     setTimeout(() => {
       if (loginForm.email === 'admin@gmail.com' && loginForm.password === 'Admin@1234') {
+        setCurrentUser(mockUsers[0]);
         setIsAuthenticated(true);
-        // Scroll to top after login
-        setTimeout(() => window.scrollTo(0, 0), 100);
+      } else if (loginForm.email === 'staff@gmail.com' && loginForm.password === 'Staff@1234') {
+        setCurrentUser(mockUsers[1]);
+        setIsAuthenticated(true);
       } else {
-        alert('Invalid credentials. Use: admin@gmail.com / Admin@1234');
+        alert('Invalid credentials.\n\nAdmin: admin@gmail.com / Admin@1234\nStaff: staff@gmail.com / Staff@1234');
       }
       setLoginLoading(false);
     }, 1000);
   };
 
-  // Enhanced view change function with scroll reset
-  const changeView = (newView: typeof currentView) => {
+  const changeView = (newView: string) => {
     setCurrentView(newView);
-    // Force immediate scroll to top
-    window.scrollTo(0, 0);
-    // Also use smooth scroll as backup
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 50);
   };
 
   const getDailyStats = () => {
     const today = new Date().toISOString().split('T')[0];
     const todayTransactions = transactions.filter(t => t.date === today);
-
     return {
       totalTransactionsToday: todayTransactions.length,
       totalStockInToday: todayTransactions.reduce((sum, t) => sum + t.deposit, 0),
@@ -152,65 +186,52 @@ const InventoryDemo: React.FC = () => {
     };
   };
 
-  const getInventorySummary = () => {
-    const itemSummary: Record<string, { totalQuantity: number; status: string }> = {};
-
+  const getInventorySummary = (): Record<string, InventorySummaryItem> => {
+    const itemSummary: Record<string, InventorySummaryItem> = {};
     items.forEach(item => {
       const itemTransactions = transactions.filter(t => t.itemId._id === item._id);
       const sortedTransactions = itemTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       const currentBalance = sortedTransactions.length > 0 ? sortedTransactions[0].balance : 0;
       
-      let status: string;
-      if (currentBalance <= 0) {
-        status = 'Unavailable';
-      } else if (currentBalance >= 1 && currentBalance <= 10) {
-        status = 'Low Stock';
-      } else {
-        status = 'In Stock';
-      }
+      let status;
+      if (currentBalance <= 0) status = 'No Stock';
+      else if (currentBalance <= item.lowStockThreshold) status = 'Low Stock';
+      else status = 'In Stock';
 
-      itemSummary[item.name] = {
-        totalQuantity: currentBalance,
-        status
-      };
+      itemSummary[item.name] = { totalQuantity: currentBalance, status };
     });
-
     return itemSummary;
   };
 
   const getStatusClasses = (status: string) => {
     switch (status) {
-      case 'Low Stock':
-        return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
-      case 'Unavailable':
-        return 'bg-red-100 text-red-800 border border-red-200';
-      case 'In Stock':
-        return 'bg-green-100 text-green-800 border border-green-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border border-gray-200';
+      case 'Low Stock': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+      case 'No Stock': return 'bg-red-100 text-red-800 border border-red-200';
+      case 'In Stock': return 'bg-green-100 text-green-800 border border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border border-gray-200';
     }
   };
 
   // Login Component
   const LoginForm = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-4 sm:p-8 mx-2">
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-            <Package className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-green-800 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Package className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-          <p className="text-sm sm:text-base text-gray-600">Sign in to access your inventory system</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Nigerian Shippers Council</h2>
+          <p className="text-gray-600">Inventory Management System</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
             <input
               type="email"
               value={loginForm.email}
               onChange={(e) => setLoginForm({...loginForm, email: e.target.value})}
-              className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Enter your email"
               required
             />
@@ -221,7 +242,7 @@ const InventoryDemo: React.FC = () => {
               type="password"
               value={loginForm.password}
               onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
-              className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Enter your password"
               required
             />
@@ -229,21 +250,28 @@ const InventoryDemo: React.FC = () => {
           <button
             type="submit"
             disabled={loginLoading}
-            className="w-full bg-blue-600 text-white py-2 sm:py-3 px-4 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 text-sm sm:text-base"
+            className="w-full bg-gradient-to-r from-blue-900 to-green-800 text-white py-3 px-4 rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
           >
             {loginLoading ? (
               <div className="flex items-center justify-center">
-                <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 Signing in...
               </div>
             ) : 'Sign In'}
           </button>
         </form>
 
-        <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
-          <p className="text-xs sm:text-sm text-gray-600 mb-2"><strong>Demo Credentials:</strong></p>
-          <p className="text-xs sm:text-sm font-mono text-gray-800">Email: admin@gmail.com</p>
-          <p className="text-xs sm:text-sm font-mono text-gray-800">Password: Admin@1234</p>
+        <div className="mt-6 space-y-3">
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2"><strong>Admin Login:</strong></p>
+            <p className="text-sm font-mono text-gray-800">admin@gmail.com</p>
+            <p className="text-sm font-mono text-gray-800">Admin@1234</p>
+          </div>
+          <div className="p-4 bg-green-50 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2"><strong>Staff Login:</strong></p>
+            <p className="text-sm font-mono text-gray-800">staff@gmail.com</p>
+            <p className="text-sm font-mono text-gray-800">Staff@1234</p>
+          </div>
         </div>
       </div>
     </div>
@@ -251,32 +279,38 @@ const InventoryDemo: React.FC = () => {
 
   // Header Component
   const Header = () => (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
-        <div className="flex justify-between items-center h-14 sm:h-16">
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Package className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
+    <header className="bg-white shadow-sm border-b sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-4 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Package className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-base sm:text-xl font-semibold text-gray-900 hidden xs:block">Inventory System</h1>
-            <h1 className="text-sm font-semibold text-gray-900 xs:hidden">Inventory</h1>
-            <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">DEMO</span>
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">NSC Inventory</h1>
+              <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">DEMO</span>
+            </div>
           </div>
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-600">
-              <User className="w-4 h-4" />
-              <span className="hidden md:inline">admin@gmail.com</span>
+          <div className="flex items-center space-x-4">
+            <div className="hidden sm:flex items-center space-x-2 text-sm">
+              <User className="w-4 h-4 text-gray-600" />
+              <span className="text-gray-600">{currentUser?.email}</span>
+              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                currentUser?.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+              }`}>
+                {currentUser?.role}
+              </span>
             </div>
             <button
               onClick={() => {
                 setIsAuthenticated(false);
+                setCurrentUser(null);
                 setCurrentView('main');
-                setTimeout(() => window.scrollTo(0, 0), 100);
               }}
-              className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all text-sm"
+              className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
             >
-              <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Logout</span>
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
             </button>
           </div>
         </div>
@@ -284,50 +318,30 @@ const InventoryDemo: React.FC = () => {
     </header>
   );
 
-  // FIXED: New Transaction Modal with proper centering
+  // New Transaction Modal
   const NewTransactionModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-    const [formData, setFormData] = useState({
-      itemId: '',
-      stockIn: '',
-      stockOut: '',
-      requestingUnit: ''
-    });
+    const [formData, setFormData] = useState({ itemId: '', stockIn: '', stockOut: '', requestingUnit: '' });
     const [showSuccess, setShowSuccess] = useState(false);
     const [itemSearch, setItemSearch] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
 
     const units = ['ADMIN', 'ICT', 'FINANCE', 'OPERATIONS', 'PUBLIC RELATION', 'CLEANERS', 'DRIVERS'];
-    const filteredItems = items.filter(item => 
-      item.name.toLowerCase().includes(itemSearch.toLowerCase())
-    );
+    const filteredItems = items.filter(item => item.name.toLowerCase().includes(itemSearch.toLowerCase()));
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      
-      if (!formData.itemId) {
-        alert('Please select an item');
-        return;
-      }
+      if (!formData.itemId) return alert('Please select an item');
 
       const stockIn = parseInt(formData.stockIn) || 0;
       const stockOut = parseInt(formData.stockOut) || 0;
 
-      if (stockIn <= 0 && stockOut <= 0) {
-        alert('Please enter either Stock In or Stock Out');
-        return;
-      }
-
-      if (stockOut > 0 && !formData.requestingUnit) {
-        alert('Please select a requesting unit for stock out');
-        return;
-      }
+      if (stockIn <= 0 && stockOut <= 0) return alert('Please enter Stock In or Stock Out');
+      if (stockOut > 0 && !formData.requestingUnit) return alert('Please select requesting unit');
 
       const selectedItem = items.find(item => item._id === formData.itemId);
       const currentBalance = transactions
         .filter(t => t.itemId._id === formData.itemId)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance || 0;
-      
-      const newBalance = currentBalance + stockIn - stockOut;
       
       const newTransaction: Transaction = {
         _id: Date.now().toString(),
@@ -335,10 +349,11 @@ const InventoryDemo: React.FC = () => {
         itemId: selectedItem!,
         deposit: stockIn,
         withdrawal: stockOut,
-        balance: newBalance,
+        balance: currentBalance + stockIn - stockOut,
         unit: stockOut > 0 ? formData.requestingUnit : undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdBy: currentUser!,
+        isDeleted: false,
+        createdAt: new Date().toISOString()
       };
 
       setTransactions(prev => [newTransaction, ...prev]);
@@ -350,145 +365,80 @@ const InventoryDemo: React.FC = () => {
     if (!isOpen) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto my-4 relative">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
           {showSuccess ? (
-            <div className="p-6 sm:p-8 text-center">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-green-600" />
               </div>
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Transaction Added Successfully!</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Transaction Added!</h3>
               <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowSuccess(false)}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm sm:text-base"
-                >
+                <button onClick={() => setShowSuccess(false)} className="flex-1 bg-blue-600 text-white py-2 rounded-lg">
                   Add More
                 </button>
-                <button
-                  onClick={() => { setShowSuccess(false); onClose(); }}
-                  className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 text-sm sm:text-base"
-                >
+                <button onClick={() => { setShowSuccess(false); onClose(); }} className="flex-1 bg-gray-600 text-white py-2 rounded-lg">
                   Done
                 </button>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">New Transaction</h2>
-                <button
-                  onClick={onClose}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-semibold">New Transaction</h2>
+                <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Date</label>
-                  <input
-                    type="text"
-                    value={new Date().toLocaleDateString()}
-                    disabled
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
-                  />
+                  <label className="block text-sm font-medium mb-2">Date</label>
+                  <input type="text" value={new Date().toLocaleDateString()} disabled className="w-full px-3 py-2 border rounded-lg bg-gray-100" />
                 </div>
-
                 <div className="relative">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Item</label>
+                  <label className="block text-sm font-medium mb-2">Item</label>
                   <input
                     type="text"
                     value={itemSearch}
-                    onChange={(e) => {
-                      setItemSearch(e.target.value);
-                      setShowDropdown(true);
-                      setFormData({...formData, itemId: ''});
-                    }}
+                    onChange={(e) => { setItemSearch(e.target.value); setShowDropdown(true); setFormData({...formData, itemId: ''}); }}
                     onFocus={() => setShowDropdown(true)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg"
                     placeholder="Search items..."
                     required
                   />
-                  
                   {showDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-32 sm:max-h-48 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                       {filteredItems.map(item => (
-                        <div
-                          key={item._id}
-                          onClick={() => {
-                            setItemSearch(item.name);
-                            setFormData({...formData, itemId: item._id});
-                            setShowDropdown(false);
-                          }}
-                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-xs sm:text-sm"
-                        >
-                          {item.name}
-                        </div>
+                        <div key={item._id} onClick={() => { setItemSearch(item.name); setFormData({...formData, itemId: item._id}); setShowDropdown(false); }}
+                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer">{item.name}</div>
                       ))}
                     </div>
                   )}
                 </div>
-
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Stock In</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.stockIn}
-                    onChange={(e) => setFormData({...formData, stockIn: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="0"
-                  />
+                  <label className="block text-sm font-medium mb-2">Stock In</label>
+                  <input type="number" min="0" value={formData.stockIn} onChange={(e) => setFormData({...formData, stockIn: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg" placeholder="0" />
                 </div>
-
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Stock Out</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.stockOut}
-                    onChange={(e) => setFormData({...formData, stockOut: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="0"
-                  />
+                  <label className="block text-sm font-medium mb-2">Stock Out</label>
+                  <input type="number" min="0" value={formData.stockOut} onChange={(e) => setFormData({...formData, stockOut: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg" placeholder="0" />
                 </div>
-
                 {parseInt(formData.stockOut) > 0 && (
                   <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Requesting Unit</label>
-                    <select
-                      value={formData.requestingUnit}
-                      onChange={(e) => setFormData({...formData, requestingUnit: e.target.value})}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="">Select requesting unit...</option>
-                      {units.map(unit => (
-                        <option key={unit} value={unit}>{unit}</option>
-                      ))}
+                    <label className="block text-sm font-medium mb-2">Requesting Unit</label>
+                    <select value={formData.requestingUnit} onChange={(e) => setFormData({...formData, requestingUnit: e.target.value})}
+                      className="w-full px-3 py-2 border rounded-lg" required>
+                      <option value="">Select unit...</option>
+                      {units.map(unit => <option key={unit} value={unit}>{unit}</option>)}
                     </select>
                   </div>
                 )}
-
-                <div className="flex space-x-3 pt-2 sm:pt-4">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 text-sm sm:text-base"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm sm:text-base"
-                  >
-                    <Plus className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Add Transaction</span>
-                    <span className="sm:hidden">Add</span>
+                <div className="flex space-x-3 pt-4">
+                  <button type="button" onClick={onClose} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg">Cancel</button>
+                  <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center">
+                    <Plus className="w-4 h-4 mr-2" />Add
                   </button>
                 </div>
               </form>
@@ -499,83 +449,115 @@ const InventoryDemo: React.FC = () => {
     );
   };
 
-  // Main Dashboard (Updated for mobile)
+  // Main Dashboard
   const MainDashboard = () => {
     const dailyStats = getDailyStats();
+    const pendingCount = deletionRequests.filter(r => r.status === 'pending').length;
 
     return (
-      <div className="space-y-4 sm:space-y-8">
-        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-          <h2 className="text-xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Store Inventory Management System
-          </h2>
-          <p className="text-sm sm:text-base text-gray-600">
-            Manage your inventory transactions efficiently. This is a demo version with sample data.
-          </p>
+      <div className="space-y-8">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Store Inventory Management System</h2>
+          <p className="text-gray-600">Manage your inventory transactions efficiently. This is a demo with sample data.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {[
-            {
-              title: 'New Data',
-              description: 'Add new inventory data',
-              icon: Package,
-              color: 'green',
-              action: () => setShowNewTransactionModal(true)
-            },
-            {
-              title: 'View Records',
-              description: 'View, search and manage records',
-              icon: Eye,
-              color: 'blue',
-              action: () => changeView('view-records')
-            },
-            {
-              title: 'Generate Report',
-              description: 'Create reports by item or date range',
-              icon: FileText,
-              color: 'purple',
-              action: () => changeView('generate-report')
-            },
-            {
-              title: 'View Summary',
-              description: 'View total quantities per item',
-              icon: TrendingUp,
-              color: 'orange',
-              action: () => changeView('inventory-summary')
-            }
-          ].map((card, index) => (
-            <div
-              key={index}
-              onClick={card.action}
-              className="bg-white rounded-xl shadow-lg p-4 sm:p-6 cursor-pointer hover:shadow-xl transition-all transform hover:scale-105 border-l-4 border-green-500 h-40 sm:h-48 flex flex-col justify-between"
-            >
-              <div className="flex items-center mb-3 sm:mb-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <card.icon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+        {/* Inventory Operations */}
+        <div>
+          <div className="flex items-center mb-4">
+            <div className="w-1 h-6 bg-blue-600 rounded-full mr-3"></div>
+            <h3 className="text-xl font-bold">Inventory Operations</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { title: 'New Data', desc: 'Add new inventory data', icon: Package, color: 'green', action: () => setShowNewTransactionModal(true) },
+              { title: 'View Records', desc: 'View and manage records', icon: Eye, color: 'blue', action: () => changeView('view-records') },
+              { title: 'Generate Report', desc: 'Create reports', icon: FileText, color: 'purple', action: () => changeView('generate-report') },
+              { title: 'View Summary', desc: 'View quantities', icon: TrendingUp, color: 'orange', action: () => changeView('inventory-summary') }
+            ].map((card, i) => (
+              <div key={i} onClick={card.action}
+                className="bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all transform hover:scale-105 border-l-4 border-green-500">
+                <div className="flex items-center mb-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <card.icon className="w-6 h-6 text-green-600" />
+                  </div>
+                  <h3 className="text-xl font-bold ml-4">{card.title}</h3>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 ml-3 sm:ml-4">{card.title}</h3>
+                <p className="text-sm text-gray-600 mb-4">{card.desc}</p>
+                <div className="text-green-600 font-medium text-sm">Click to {card.title.toLowerCase()} →</div>
               </div>
-              <div className="flex-grow">
-                <p className="text-sm sm:text-base font-semibold text-gray-600 mb-3 sm:mb-4">{card.description}</p>
-              </div>
-              <div className="text-green-600 font-medium text-xs sm:text-sm">Click to {card.title.toLowerCase()} →</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Today's Statistics</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Management */}
+        <div>
+          <div className="flex items-center mb-4">
+            <div className="w-1 h-6 bg-indigo-600 rounded-full mr-3"></div>
+            <h3 className="text-xl font-bold">Management & Administration</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div onClick={() => changeView('my-requests')}
+              className="bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all border-l-4 border-yellow-500">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <ClipboardList className="w-6 h-6 text-yellow-600" />
+                </div>
+                <h3 className="text-xl font-bold ml-4">My Requests</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">View your deletion requests</p>
+              <div className="text-yellow-600 font-medium text-sm">View requests →</div>
+            </div>
+
+            {currentUser?.role === 'admin' && (
+              <>
+                <div onClick={() => changeView('user-management')}
+                  className="bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all border-l-4 border-indigo-500">
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                      <Users className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <h3 className="text-xl font-bold ml-4">User Management</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">Manage users</p>
+                  <div className="text-indigo-600 font-medium text-sm">Admin only →</div>
+                </div>
+
+                <div onClick={() => changeView('pending-deletions')}
+                  className="bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all border-l-4 border-red-500 relative">
+                  {pendingCount > 0 && (
+                    <div className="absolute top-2 right-2">
+                      <span className="flex items-center justify-center w-6 h-6 bg-red-600 text-white text-xs font-bold rounded-full">
+                        {pendingCount}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                      <AlertCircle className="w-6 h-6 text-red-600" />
+                    </div>
+                    <h3 className="text-xl font-bold ml-4">Pending Deletions</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">Review requests</p>
+                  <div className="text-red-600 font-medium text-sm">{pendingCount > 0 ? `${pendingCount} pending →` : 'No pending →'}</div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Today's Stats */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-lg font-semibold mb-4">Today's Statistics</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { label: 'Total Items', value: items.length },
               { label: 'Records Today', value: dailyStats.totalTransactionsToday },
               { label: 'Stock In Today', value: dailyStats.totalStockInToday },
               { label: 'Stock Out Today', value: dailyStats.totalStockOutToday }
-            ].map((stat, index) => (
-              <div key={index} className="bg-gray-50 rounded-lg p-3 sm:p-4">
-                <h4 className="text-xs sm:text-sm font-medium text-gray-500 mb-1">{stat.label}</h4>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{stat.value}</p>
+            ].map((stat, i) => (
+              <div key={i} className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">{stat.label}</h4>
+                <p className="text-2xl font-bold">{stat.value}</p>
               </div>
             ))}
           </div>
@@ -584,246 +566,91 @@ const InventoryDemo: React.FC = () => {
     );
   };
 
-  // ViewRecords with scroll reset
+  // View Records
   const ViewRecords = () => {
     const [search, setSearch] = useState('');
     const [selectedItem, setSelectedItem] = useState('all');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [showInventorySummary, setShowInventorySummary] = useState(false);
 
-    const filteredTransactions = transactions.filter(transaction => {
-      const matchesSearch = transaction.itemId.name.toLowerCase().includes(search.toLowerCase());
-      const matchesItem = selectedItem === 'all' || transaction.itemId._id === selectedItem;
-      const matchesDateRange = (!startDate || transaction.date >= startDate) && (!endDate || transaction.date <= endDate);
-      
+    const filteredTransactions = transactions.filter(t => {
+      const matchesSearch = t.itemId.name.toLowerCase().includes(search.toLowerCase());
+      const matchesItem = selectedItem === 'all' || t.itemId._id === selectedItem;
+      const matchesDateRange = (!startDate || t.date >= startDate) && (!endDate || t.date <= endDate);
       return matchesSearch && matchesItem && matchesDateRange;
     });
 
-    const inventorySummary = getInventorySummary();
-
-    const groupTransactionsByDate = () => {
-      const grouped: { [key: string]: Transaction[] } = {};
-      
-      filteredTransactions.forEach(transaction => {
-        const dateKey = new Date(transaction.date).toDateString();
-        if (!grouped[dateKey]) {
-          grouped[dateKey] = [];
-        }
-        grouped[dateKey].push(transaction);
-      });
-
-      return grouped;
-    };
-
-    const groupedTransactions = groupTransactionsByDate();
-
     return (
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col gap-3 sm:gap-0 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
-            <button
-              onClick={() => changeView('main')}
-              className="flex items-center justify-center sm:justify-start space-x-2 px-3 sm:px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all text-sm"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to Dashboard</span>
-            </button>
-            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 text-center sm:text-left">View Records</h2>
-          </div>
-          
-          <button
-            onClick={() => setShowInventorySummary(!showInventorySummary)}
-            className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-all text-sm"
-          >
-            <Package className="w-4 h-4" />
-            <span className="hidden sm:inline">{showInventorySummary ? 'Show Transactions' : 'Show Inventory Summary'}</span>
-            <span className="sm:hidden">{showInventorySummary ? 'Transactions' : 'Summary'}</span>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <button onClick={() => changeView('main')} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+            <ArrowLeft className="w-4 h-4" /><span>Back to Dashboard</span>
           </button>
+          <h2 className="text-2xl font-bold">View Records</h2>
         </div>
 
-        {/* Mobile-optimized filters */}
-        <div className="bg-white rounded-xl shadow-lg p-3 sm:p-6">
-          <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 md:grid-cols-4 sm:gap-4 mb-4">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg" />
             </div>
-
-            <select
-              value={selectedItem}
-              onChange={(e) => setSelectedItem(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
+            <select value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)} className="px-3 py-2 border rounded-lg">
               <option value="all">All Items</option>
-              {items.map(item => (
-                <option key={item._id} value={item._id}>{item.name}</option>
-              ))}
+              {items.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}
             </select>
-
-            {/* FIXED: Better date inputs with labels */}
-            <div className="relative">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                title="Start Date"
-              />
-              <label className="absolute -top-2 left-2 bg-white px-1 text-xs text-gray-500">Start Date</label>
-            </div>
-            
-            <div className="relative">
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                title="End Date"
-              />
-              <label className="absolute -top-2 left-2 bg-white px-1 text-xs text-gray-500">End Date</label>
-            </div>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-3 py-2 border rounded-lg" />
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-3 py-2 border rounded-lg" />
           </div>
-
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <p className="text-xs sm:text-sm text-gray-600">
-              Showing {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
-            </p>
-            <button
-              onClick={() => {
-                setSearch('');
-                setSelectedItem('all');
-                setStartDate('');
-                setEndDate('');
-              }}
-              className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Clear Filters
-            </button>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-600">Showing {filteredTransactions.length} transaction(s)</p>
+            <button onClick={() => { setSearch(''); setSelectedItem('all'); setStartDate(''); setEndDate(''); }}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium">Clear Filters</button>
           </div>
         </div>
 
-        {showInventorySummary ? (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-800">Inventory Summary</h3>
-              <p className="text-xs sm:text-sm text-gray-600">Current stock levels for all items</p>
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          {filteredTransactions.length === 0 ? (
+            <div className="p-8 text-center">
+              <Filter className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
+              <p className="text-gray-600">Try adjusting your search criteria.</p>
             </div>
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[700px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock In</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Out</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {Object.entries(inventorySummary).map(([itemName, itemData]) => (
-                    <tr key={itemName}>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium text-gray-900 text-xs sm:text-sm">{itemName}</td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-900 text-xs sm:text-sm">{itemData.totalQuantity.toLocaleString()}</td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(itemData.status)}`}>
-                          {itemData.status}
-                        </span>
-                      </td>
+                  {filteredTransactions.map((t) => (
+                    <tr key={t._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm">{new Date(t.date).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-sm font-medium">{t.itemId.name}</td>
+                      <td className="px-6 py-4 text-sm text-green-600 font-medium">{t.deposit > 0 ? `+${t.deposit}` : '-'}</td>
+                      <td className="px-6 py-4 text-sm text-red-600 font-medium">{t.withdrawal > 0 ? `-${t.withdrawal}` : '-'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{t.unit || '-'}</td>
+                      <td className="px-6 py-4 text-sm font-medium">{t.balance}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            {filteredTransactions.length === 0 ? (
-              <div className="p-6 sm:p-8 text-center">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Filter className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
-                </div>
-                <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
-                <p className="text-sm sm:text-base text-gray-600">Try adjusting your search criteria or add new transactions.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[600px]">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock In</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Out</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white">
-                    {Object.entries(groupedTransactions)
-                      .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-                      .map(([dateKey, dayTransactions], dayIndex) => (
-                      <React.Fragment key={dateKey}>
-                        {dayIndex > 0 && (
-                          <tr>
-                            <td colSpan={6} className="px-0 py-0">
-                              <div className="w-full border-t-4 border-gray-800"></div>
-                            </td>
-                          </tr>
-                        )}
-                        
-                        <tr className="bg-gray-50">
-                          <td colSpan={6} className="px-3 sm:px-6 py-2 text-xs sm:text-sm font-semibold text-gray-700 border-b border-gray-200">
-                            {new Date(dateKey).toLocaleDateString('en-US', { 
-                              weekday: 'long', 
-                              year: 'numeric', 
-                              month: 'long', 
-                              day: 'numeric' 
-                            })} ({dayTransactions.length} transaction{dayTransactions.length !== 1 ? 's' : ''})
-                          </td>
-                        </tr>
-                        
-                        {dayTransactions
-                          .sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())
-                          .map((transaction) => (
-                          <tr key={transaction._id} className="hover:bg-gray-50 border-b border-gray-100">
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900 whitespace-nowrap">
-                              {new Date(transaction.date).toLocaleDateString()}
-                            </td>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-gray-900">
-                              {transaction.itemId.name}
-                            </td>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-green-600 font-medium">
-                              {transaction.deposit > 0 ? `+${transaction.deposit}` : '-'}
-                            </td>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-red-600 font-medium">
-                              {transaction.withdrawal > 0 ? `-${transaction.withdrawal}` : '-'}
-                            </td>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-600">
-                              {transaction.unit || '-'}
-                            </td>
-                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-gray-900">
-                              {transaction.balance}
-                            </td>
-                          </tr>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };
 
-  // Generate Report Component with scroll reset and FIXED date inputs
+  // Generate Report
   const GenerateReport = () => {
     const [selectedItem, setSelectedItem] = useState('all');
     const [startDate, setStartDate] = useState('');
@@ -833,212 +660,102 @@ const InventoryDemo: React.FC = () => {
 
     const generateReport = () => {
       setReportLoading(true);
-      
-      const filteredTransactions = transactions.filter(transaction => {
-        const matchesItem = selectedItem === 'all' || transaction.itemId._id === selectedItem;
-        const matchesDateRange = (!startDate || transaction.date >= startDate) && (!endDate || transaction.date <= endDate);
-        
+      const filteredTransactions = transactions.filter(t => {
+        const matchesItem = selectedItem === 'all' || t.itemId._id === selectedItem;
+        const matchesDateRange = (!startDate || t.date >= startDate) && (!endDate || t.date <= endDate);
         return matchesItem && matchesDateRange;
       });
 
       const totalDeposits = filteredTransactions.reduce((sum, t) => sum + t.deposit, 0);
       const totalWithdrawals = filteredTransactions.reduce((sum, t) => sum + t.withdrawal, 0);
-      const finalBalance = totalDeposits - totalWithdrawals;
-
-      const itemSummary: Record<string, { deposits: number; withdrawals: number; transactions: number }> = {};
-      
-      filteredTransactions.forEach(transaction => {
-        const itemName = transaction.itemId.name;
-        if (!itemSummary[itemName]) {
-          itemSummary[itemName] = { deposits: 0, withdrawals: 0, transactions: 0 };
-        }
-        itemSummary[itemName].deposits += transaction.deposit;
-        itemSummary[itemName].withdrawals += transaction.withdrawal;
-        itemSummary[itemName].transactions += 1;
-      });
-
-      const report: ReportData = {
-        transactions: filteredTransactions.slice(0, 10),
-        summary: {
-          totalDeposits,
-          totalWithdrawals,
-          finalBalance,
-          transactionCount: filteredTransactions.length
-        },
-        itemSummary
-      };
 
       setTimeout(() => {
-        setReportData(report);
+        setReportData({
+          transactions: filteredTransactions.slice(0, 10),
+          summary: {
+            totalDeposits,
+            totalWithdrawals,
+            finalBalance: totalDeposits - totalWithdrawals,
+            transactionCount: filteredTransactions.length
+          }
+        });
         setReportLoading(false);
-        // Scroll to show the generated report
-        setTimeout(() => {
-          window.scrollTo({ top: 200, behavior: 'smooth' });
-        }, 100);
       }, 1000);
     };
 
-    const exportReport = (format: 'pdf' | 'excel') => {
-      alert(`${format.toUpperCase()} export functionality would be implemented with backend API calls in the full version. This demo shows the UI and data structure.`);
-    };
-
     return (
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col gap-3 sm:gap-0 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            onClick={() => changeView('main')}
-            className="flex items-center justify-center sm:justify-start space-x-2 px-3 sm:px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <button onClick={() => changeView('main')} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+            <ArrowLeft className="w-4 h-4" /><span>Back</span>
           </button>
-          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 text-center sm:text-left">
-            Generate Report
-          </h2>
+          <h2 className="text-2xl font-bold">Generate Report</h2>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-3 sm:p-6">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Report Parameters</h3>
-
-          <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-lg font-semibold mb-4">Report Parameters</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Item</label>
-              <select
-                value={selectedItem}
-                onChange={(e) => setSelectedItem(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
+              <label className="block text-sm font-medium mb-2">Item</label>
+              <select value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)} className="w-full px-3 py-2 border rounded-lg">
                 <option value="all">All Items</option>
-                {items.map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.name}
-                  </option>
-                ))}
+                {items.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}
               </select>
             </div>
-
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <label className="block text-sm font-medium mb-2">Start Date</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
             </div>
-
-            <div className="sm:col-span-2 lg:col-span-1">
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div>
+              <label className="block text-sm font-medium mb-2">End Date</label>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
             </div>
           </div>
-
-          <button
-            onClick={generateReport}
-            disabled={reportLoading}
-            className="w-full bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-          >
+          <button onClick={generateReport} disabled={reportLoading}
+            className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
             {reportLoading ? (
               <div className="flex items-center justify-center">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 Generating...
               </div>
-            ) : (
-              <>
-                <BarChart3 className="w-4 h-4 inline mr-2" />
-                Generate Report
-              </>
-            )}
+            ) : (<><BarChart3 className="w-4 h-4 inline mr-2" />Generate Report</>)}
           </button>
         </div>
 
         {reportData && (
-          <div className="space-y-4 sm:space-y-6">
-            <div className="bg-white rounded-xl shadow-lg p-3 sm:p-6">
-              <div className="text-center">
-                <h3 className="text-base sm:text-xl font-bold text-gray-900 mb-2">
-                  {selectedItem === 'all' ? 'Inventory Report On All Items' : 
-                   `Inventory Report On ${items.find(i => i._id === selectedItem)?.name || 'Unknown Item'}`}
-                </h3>
-                {(startDate || endDate) && (
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    {startDate && endDate && startDate !== endDate ? 
-                     `From: ${new Date(startDate).toLocaleDateString()} To: ${new Date(endDate).toLocaleDateString()}` :
-                     startDate && endDate && startDate === endDate ?
-                     `For: ${new Date(startDate).toLocaleDateString()}` :
-                     startDate ? `From: ${new Date(startDate).toLocaleDateString()}` :
-                     `Up to: ${new Date(endDate).toLocaleDateString()}`}
-                  </p>
-                )}
-              </div>
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-lg p-6 text-center">
+              <h3 className="text-xl font-bold mb-2">
+                {selectedItem === 'all' ? 'Inventory Report On All Items' : `Inventory Report On ${items.find(i => i._id === selectedItem)?.name}`}
+              </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               {[
-                { label: 'Total Stock In', value: reportData.summary.totalDeposits, color: 'green', icon: '+' },
-                { label: 'Total Stock Out', value: reportData.summary.totalWithdrawals, color: 'red', icon: '-' },
-                { label: 'Net Balance', value: reportData.summary.finalBalance, color: 'blue', icon: FileText },
-                { label: 'Total Transactions', value: reportData.summary.transactionCount, color: 'gray', icon: BarChart3 }
-              ].map((stat, index) => (
-                <div key={index} className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs sm:text-sm font-medium text-gray-600">{stat.label}</p>
-                      <p className={`text-lg sm:text-2xl font-bold ${
-                        stat.color === 'green' ? 'text-green-600' :
-                        stat.color === 'red' ? 'text-red-600' :
-                        stat.color === 'blue' ? 'text-blue-600' : 'text-gray-900'
-                      }`}>
-                        {stat.value.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className={`w-8 h-8 sm:w-12 sm:h-12 ${
-                      stat.color === 'green' ? 'bg-green-100' :
-                      stat.color === 'red' ? 'bg-red-100' :
-                      stat.color === 'blue' ? 'bg-blue-100' : 'bg-gray-100'
-                    } rounded-lg flex items-center justify-center`}>
-                      {typeof stat.icon === 'string' ? (
-                        <span className={`${
-                          stat.color === 'green' ? 'text-green-600' :
-                          stat.color === 'red' ? 'text-red-600' :
-                          stat.color === 'blue' ? 'text-blue-600' : 'text-gray-600'
-                        } text-base sm:text-xl`}>
-                          {stat.icon}
-                        </span>
-                      ) : (
-                        <stat.icon className={`w-4 h-4 sm:w-6 sm:h-6 ${
-                          stat.color === 'green' ? 'text-green-600' :
-                          stat.color === 'red' ? 'text-red-600' :
-                          stat.color === 'blue' ? 'text-blue-600' : 'text-gray-600'
-                        }`} />
-                      )}
-                    </div>
-                  </div>
+                { label: 'Total Stock In', value: reportData.summary.totalDeposits, color: 'green' },
+                { label: 'Total Stock Out', value: reportData.summary.totalWithdrawals, color: 'red' },
+                { label: 'Current Balance', value: reportData.summary.finalBalance, color: 'blue' },
+                { label: 'Total Transactions', value: reportData.summary.transactionCount, color: 'gray' }
+              ].map((stat, i) => (
+                <div key={i} className="bg-white rounded-xl shadow-lg p-6">
+                  <p className="text-sm font-medium text-gray-600">{stat.label}</p>
+                  <p className={`text-2xl font-bold ${
+                    stat.color === 'green' ? 'text-green-600' :
+                    stat.color === 'red' ? 'text-red-600' :
+                    stat.color === 'blue' ? 'text-blue-600' : 'text-gray-900'
+                  }`}>{stat.value.toLocaleString()}</p>
                 </div>
               ))}
             </div>
 
-            <div className="bg-white rounded-xl shadow-lg p-3 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">Export Report</h3>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => exportReport('pdf')}
-                  className="flex items-center justify-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-all text-sm"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Export PDF</span>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold mb-4">Export Report</h3>
+              <div className="flex gap-3">
+                <button onClick={() => alert('PDF export (Demo)')} className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg">
+                  <Download className="w-4 h-4" /><span>Export PDF</span>
                 </button>
-                <button
-                  onClick={() => exportReport('excel')}
-                  className="flex items-center justify-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all text-sm"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Export Excel</span>
+                <button onClick={() => alert('Excel export (Demo)')} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg">
+                  <Download className="w-4 h-4" /><span>Export Excel</span>
                 </button>
               </div>
             </div>
@@ -1048,64 +765,54 @@ const InventoryDemo: React.FC = () => {
     );
   };
 
-  // Inventory Summary Component with scroll reset
+  // Inventory Summary
   const InventorySummary = () => {
     const inventorySummary = getInventorySummary();
 
     return (
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col gap-3 sm:gap-0 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            onClick={() => changeView('main')}
-            className="flex items-center justify-center sm:justify-start space-x-2 px-3 sm:px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all text-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <button onClick={() => changeView('main')} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+            <ArrowLeft className="w-4 h-4" /><span>Back</span>
           </button>
-          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 text-center sm:text-left">
-            Inventory Summary
-          </h2>
+          <h2 className="text-2xl font-bold">Inventory Summary</h2>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-3 sm:p-6">
-          <div className="mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Current Stock Status</h3>
-            <p className="text-xs sm:text-base text-gray-600">Overview of all items and their current quantities</p>
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h4 className="text-base font-medium mb-4">Status Distribution</h4>
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {['In Stock', 'Low Stock', 'No Stock'].map(status => {
+              const count = Object.values(inventorySummary).filter((item: InventorySummaryItem) => item.status === status).length;
+              return (
+                <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className={`w-3 h-3 rounded-full mx-auto mb-2 ${
+                    status === 'In Stock' ? 'bg-green-500' : status === 'Low Stock' ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}></div>
+                  <p className="text-2xl font-bold">{count}</p>
+                  <p className="text-sm text-gray-600">{status}</p>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            {Object.entries(inventorySummary).map(([itemName, itemData]) => (
-              <div key={itemName} className="bg-gray-50 rounded-lg p-3 sm:p-4">
-                <div className="flex items-center justify-between mb-2 sm:mb-3">
-                  <h4 className="font-medium text-gray-900 text-sm sm:text-base truncate pr-2">{itemName}</h4>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getStatusClasses(itemData.status)}`}>
-                    {itemData.status}
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <Package className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 mr-2" />
-                  <span className="text-lg sm:text-xl font-bold text-gray-900">
-                    {itemData.totalQuantity.toLocaleString()}
-                  </span>
-                  <span className="text-xs sm:text-sm text-gray-500 ml-1">units</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t pt-4 sm:pt-6">
-            <h4 className="font-medium text-gray-900 mb-4 text-sm sm:text-base">Status Distribution</h4>
-            <div className="grid grid-cols-3 gap-3 sm:gap-4">
-              {['In Stock', 'Low Stock', 'Unavailable'].map(status => {
-                const count = Object.values(inventorySummary).filter(item => item.status === status).length;
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold mb-4">Current Stock Status</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Object.entries(inventorySummary).map(([itemName, itemData]) => {
+                const typedItemData = itemData as InventorySummaryItem;
                 return (
-                  <div key={status} className="text-center p-3 sm:p-4 bg-gray-50 rounded-lg">
-                    <div className={`w-3 h-3 rounded-full mx-auto mb-2 ${
-                      status === 'In Stock' ? 'bg-green-500' :
-                      status === 'Low Stock' ? 'bg-yellow-500' : 'bg-red-500'
-                    }`}></div>
-                    <p className="text-lg sm:text-2xl font-bold text-gray-900">{count}</p>
-                    <p className="text-xs sm:text-sm text-gray-600">{status}</p>
+                  <div key={itemName} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <h4 className="font-medium text-sm">{itemName}</h4>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(typedItemData.status)}`}>
+                        {typedItemData.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      <Package className="w-5 h-5 text-gray-400 mr-2" />
+                      <span className="text-xl font-bold">{typedItemData.totalQuantity}</span>
+                      <span className="text-sm text-gray-500 ml-1">units</span>
+                    </div>
                   </div>
                 );
               })}
@@ -1116,16 +823,231 @@ const InventoryDemo: React.FC = () => {
     );
   };
 
+  // User Management
+  const UserManagement = () => {
+    const [showInviteModal, setShowInviteModal] = useState(false);
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button onClick={() => changeView('main')} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+                <ArrowLeft className="w-4 h-4" /><span>Back</span>
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold flex items-center">
+                  <Users className="w-7 h-7 mr-3 text-blue-600" />User Management
+                </h1>
+                <p className="text-gray-600">Manage users and invitations</p>
+              </div>
+            </div>
+            <button onClick={() => setShowInviteModal(true)} className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg">
+              <UserPlus className="w-4 h-4" /><span>Invite User</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Users', value: users.length, icon: Users, color: 'blue' },
+            { label: 'Admins', value: users.filter(u => u.role === 'admin').length, icon: Shield, color: 'purple' },
+            { label: 'Staff', value: users.filter(u => u.role === 'staff').length, icon: Users, color: 'green' },
+            { label: 'Pending Invites', value: 0, icon: Mail, color: 'yellow' }
+          ].map((stat, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center">
+                <div className={`w-10 h-10 bg-${stat.color}-100 rounded-lg flex items-center justify-center`}>
+                  <stat.icon className={`w-5 h-5 text-${stat.color}-600`} />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">{stat.label}</p>
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="p-6 border-b">
+            <h2 className="text-lg font-semibold">All Users</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium">{user.email.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <p className="ml-4 text-sm font-medium">{user.email}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                      }`}>{user.role}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold">Invite New User</h3>
+                <button onClick={() => setShowInviteModal(false)}><X className="w-5 h-5" /></button>
+              </div>
+              <form className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Email Address</label>
+                  <input type="email" className="w-full px-3 py-2 border rounded-lg" placeholder="user@gmail.com" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Role</label>
+                  <select className="w-full px-3 py-2 border rounded-lg">
+                    <option value="staff">Staff</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div className="flex space-x-3">
+                  <button type="button" onClick={() => { alert('Invitation sent! (Demo)'); setShowInviteModal(false); }}
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg">Send Invitation</button>
+                  <button type="button" onClick={() => setShowInviteModal(false)}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Pending Deletions
+  const PendingDeletions = () => (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center space-x-4">
+          <button onClick={() => changeView('main')} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+            <ArrowLeft className="w-4 h-4" /><span>Back</span>
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold">Pending Deletion Requests</h1>
+            <p className="text-gray-600">Review staff deletion requests</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {deletionRequests.map((request) => (
+          <div key={request._id} className="bg-white rounded-xl shadow-lg p-6">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold mb-2">{request.recordType} Deletion Request</h3>
+              <div className="space-y-1 text-sm text-gray-600">
+                <p>Requested by: <strong>{request.requestedBy.email}</strong> ({request.requestedBy.role})</p>
+                <p>Requested: {new Date(request.requestedAt).toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm font-medium mb-2">Reason:</p>
+              <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{request.reason}</p>
+            </div>
+            <div className="flex space-x-3">
+              <button onClick={() => alert('Request approved! (Demo)')}
+                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg">
+                <CheckCircle className="w-4 h-4 mr-2" />Approve
+              </button>
+              <button onClick={() => alert('Request declined! (Demo)')}
+                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg">
+                <XCircle className="w-4 h-4 mr-2" />Decline
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // My Requests
+  const MyRequests = () => {
+    const myRequests = deletionRequests.filter(r => r.requestedBy.id === currentUser?.id);
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center space-x-4">
+            <button onClick={() => changeView('main')} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+              <ArrowLeft className="w-4 h-4" /><span>Back</span>
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold">My Deletion Requests</h1>
+              <p className="text-gray-600">View your deletion request status</p>
+            </div>
+          </div>
+        </div>
+
+        {myRequests.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+            <ClipboardList className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No deletion requests</h3>
+            <p className="text-gray-500">You haven't submitted any requests yet</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {myRequests.map((request) => (
+              <div key={request._id} className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">{request.recordType} Deletion Request</h3>
+                    <p className="text-sm text-gray-600">Submitted: {new Date(request.requestedAt).toLocaleString()}</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                    {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Your Reason:</p>
+                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{request.reason}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderCurrentView = () => {
     switch (currentView) {
-      case 'view-records':
-        return <ViewRecords />;
-      case 'generate-report':
-        return <GenerateReport />;
-      case 'inventory-summary':
-        return <InventorySummary />;
-      default:
-        return <MainDashboard />;
+      case 'view-records': return <ViewRecords />;
+      case 'generate-report': return <GenerateReport />;
+      case 'inventory-summary': return <InventorySummary />;
+      case 'user-management': return currentUser?.role === 'admin' ? <UserManagement /> : <MainDashboard />;
+      case 'pending-deletions': return currentUser?.role === 'admin' ? <PendingDeletions /> : <MainDashboard />;
+      case 'my-requests': return <MyRequests />;
+      default: return <MainDashboard />;
     }
   };
 
@@ -1133,34 +1055,27 @@ const InventoryDemo: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="w-8 h-8 sm:w-12 sm:h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 text-sm sm:text-base">Loading demo data...</p>
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading demo data...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return <LoginForm />;
-  }
+  if (!isAuthenticated) return <LoginForm />;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
         {renderCurrentView()}
-        <NewTransactionModal
-          isOpen={showNewTransactionModal}
-          onClose={() => setShowNewTransactionModal(false)}
-        />
+        <NewTransactionModal isOpen={showNewTransactionModal} onClose={() => setShowNewTransactionModal(false)} />
       </main>
       
-      <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 bg-blue-600 text-white px-3 py-2 rounded-lg shadow-lg text-xs sm:text-sm">
-        <p className="font-medium">Demo Mode</p>
+      <div className="fixed bottom-4 right-4 bg-gradient-to-r from-blue-900 to-green-800 text-white px-4 py-3 rounded-lg shadow-lg">
+        <p className="font-medium text-sm">Demo Mode</p>
         <p className="text-xs">Sample data • No backend required</p>
       </div>
     </div>
   );
-};
-
-export default InventoryDemo;
+}
