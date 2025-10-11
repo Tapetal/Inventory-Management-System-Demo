@@ -220,7 +220,7 @@ export default function NSCInventoryDemo() {
           <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Package className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Nigerian Shippers Council</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Company Name</h2>
           <p className="text-gray-600">Inventory Management System</p>
         </div>
 
@@ -287,7 +287,7 @@ export default function NSCInventoryDemo() {
               <Package className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-gray-900">NSC Inventory</h1>
+              <h1 className="text-lg font-semibold text-gray-900">Company Name Inventory</h1>
               <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded">DEMO</span>
             </div>
           </div>
