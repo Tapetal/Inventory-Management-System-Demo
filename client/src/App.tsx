@@ -320,144 +320,152 @@ export default function NSCInventoryDemo() {
 
   // New Transaction Modal
   const NewTransactionModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-    const [formData, setFormData] = useState({ itemId: '', stockIn: '', stockOut: '', requestingUnit: '' });
-    const [showSuccess, setShowSuccess] = useState(false);
-    const [itemSearch, setItemSearch] = useState('');
-    const [showDropdown, setShowDropdown] = useState(false);
+  const [formData, setFormData] = useState({ itemId: '', stockIn: '', stockOut: '', requestingUnit: '' });
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
-    const units = ['ADMIN', 'ICT', 'FINANCE', 'OPERATIONS', 'PUBLIC RELATION', 'CLEANERS', 'DRIVERS'];
-    const filteredItems = items.filter(item => item.name.toLowerCase().includes(itemSearch.toLowerCase()));
+  const units = ['ADMIN', 'ICT', 'FINANCE', 'OPERATIONS', 'PUBLIC RELATION', 'CLEANERS', 'DRIVERS'];
+  const filteredItems = items.filter(item => item.name.toLowerCase().includes(itemSearch.toLowerCase()));
 
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!formData.itemId) return alert('Please select an item');
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.itemId) return alert('Please select an item');
 
-      const stockIn = parseInt(formData.stockIn) || 0;
-      const stockOut = parseInt(formData.stockOut) || 0;
+    const stockIn = parseInt(formData.stockIn) || 0;
+    const stockOut = parseInt(formData.stockOut) || 0;
 
-      if (stockIn <= 0 && stockOut <= 0) return alert('Please enter Stock In or Stock Out');
-      if (stockOut > 0 && !formData.requestingUnit) return alert('Please select requesting unit');
+    if (stockIn <= 0 && stockOut <= 0) return alert('Please enter Stock In or Stock Out');
+    if (stockOut > 0 && !formData.requestingUnit) return alert('Please select requesting unit');
 
-      const selectedItem = items.find(item => item._id === formData.itemId);
-      const currentBalance = transactions
-        .filter(t => t.itemId._id === formData.itemId)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance || 0;
-      
-      // Check if withdrawal would result in negative balance
-      if (stockOut > 0 && currentBalance + stockIn < stockOut) {
-        return alert(`Insufficient stock! Current available balance: ${currentBalance + stockIn} units`);
-      }
-      
-      const newTransaction: Transaction = {
-        _id: Date.now().toString(),
-        date: new Date().toISOString().split('T')[0],
-        itemId: selectedItem!,
-        deposit: stockIn,
-        withdrawal: stockOut,
-        balance: currentBalance + stockIn - stockOut,
-        unit: stockOut > 0 ? formData.requestingUnit : undefined,
-        createdBy: currentUser!,
-        isDeleted: false,
-        createdAt: new Date().toISOString()
-      };
-
-      setTransactions(prev => [newTransaction, ...prev]);
-      setShowSuccess(true);
-      setFormData({ itemId: '', stockIn: '', stockOut: '', requestingUnit: '' });
-      setItemSearch('');
+    const selectedItem = items.find(item => item._id === formData.itemId);
+    const currentBalance = transactions
+      .filter(t => t.itemId._id === formData.itemId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance || 0;
+    
+    // Check if withdrawal would result in negative balance
+    if (stockOut > 0 && currentBalance + stockIn < stockOut) {
+      return alert(`Insufficient stock! Current available balance: ${currentBalance + stockIn} units`);
+    }
+    
+    const newTransaction: Transaction = {
+      _id: Date.now().toString(),
+      date: new Date().toISOString().split('T')[0],
+      itemId: selectedItem!,
+      deposit: stockIn,
+      withdrawal: stockOut,
+      balance: currentBalance + stockIn - stockOut,
+      unit: stockOut > 0 ? formData.requestingUnit : undefined,
+      createdBy: currentUser!,
+      isDeleted: false,
+      createdAt: new Date().toISOString()
     };
 
-    if (!isOpen) return null;
+    setTransactions(prev => [newTransaction, ...prev]);
+    setShowSuccess(true);
+    setFormData({ itemId: '', stockIn: '', stockOut: '', requestingUnit: '' });
+    setItemSearch('');
+  };
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-          {showSuccess ? (
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="w-8 h-8 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Transaction Added!</h3>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowSuccess(false)}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
-                >
-                  Add More
-                </button>
-                <button
-                  onClick={() => { setShowSuccess(false); onClose(); }}
-                  className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700"
-                >
-                  Done
-                </button>
-              </div>
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        {showSuccess ? (
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check className="w-8 h-8 text-green-600" />
             </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between p-6 border-b">
-                <h2 className="text-xl font-semibold">New Transaction</h2>
-                <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-                  <X className="w-5 h-5" />
-                </button>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Transaction Added Successfully!</h3>
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowSuccess(false)}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+              >
+                Add More
+              </button>
+              <button
+                onClick={() => { setShowSuccess(false); onClose(); }}
+                className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">New Transaction</h2>
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                <input type="date" value={new Date().toISOString().split('T')[0]} disabled 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm" />
               </div>
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Date</label>
-                  <input type="text" value={new Date().toLocaleDateString()} disabled className="w-full px-3 py-2 border rounded-lg bg-gray-100" />
-                </div>
-                <div className="relative">
-                  <label className="block text-sm font-medium mb-2">Item</label>
-                  <input
-                    type="text"
-                    value={itemSearch}
-                    onChange={(e) => { setItemSearch(e.target.value); setShowDropdown(true); setFormData({...formData, itemId: ''}); }}
-                    onFocus={() => setShowDropdown(true)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="Search items..."
-                    required
-                  />
-                  {showDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                      {filteredItems.map(item => (
-                        <div key={item._id} onClick={() => { setItemSearch(item.name); setFormData({...formData, itemId: item._id}); setShowDropdown(false); }}
-                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer">{item.name}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Stock In</label>
-                  <input type="number" min="0" value={formData.stockIn} onChange={(e) => setFormData({...formData, stockIn: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg" placeholder="0" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Stock Out</label>
-                  <input type="number" min="0" value={formData.stockOut} onChange={(e) => setFormData({...formData, stockOut: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg" placeholder="0" />
-                </div>
-                {parseInt(formData.stockOut) > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Requesting Unit</label>
-                    <select value={formData.requestingUnit} onChange={(e) => setFormData({...formData, requestingUnit: e.target.value})}
-                      className="w-full px-3 py-2 border rounded-lg" required>
-                      <option value="">Select unit...</option>
-                      {units.map(unit => <option key={unit} value={unit}>{unit}</option>)}
-                    </select>
+              <div className="relative">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Item</label>
+                <input
+                  type="text"
+                  value={itemSearch}
+                  onChange={(e) => { setItemSearch(e.target.value); setShowDropdown(true); setFormData({...formData, itemId: ''}); }}
+                  onFocus={() => setShowDropdown(true)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Search items..."
+                  required
+                />
+                {showDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-32 overflow-y-auto">
+                    {filteredItems.map(item => (
+                      <div key={item._id} onClick={() => { setItemSearch(item.name); setFormData({...formData, itemId: item._id}); setShowDropdown(false); }}
+                        className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-xs">{item.name}</div>
+                    ))}
                   </div>
                 )}
-                <div className="flex space-x-3 pt-4">
-                  <button type="button" onClick={onClose} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg">Cancel</button>
-                  <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center">
-                    <Plus className="w-4 h-4 mr-2" />Add
-                  </button>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Stock In</label>
+                <input type="number" min="0" step="1" value={formData.stockIn} 
+                  onChange={(e) => setFormData({...formData, stockIn: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Stock Out</label>
+                <input type="number" min="0" step="1" value={formData.stockOut} 
+                  onChange={(e) => setFormData({...formData, stockOut: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0" />
+              </div>
+              {parseInt(formData.stockOut) > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Requesting Unit</label>
+                  <select value={formData.requestingUnit} onChange={(e) => setFormData({...formData, requestingUnit: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" required>
+                    <option value="">Select requesting unit...</option>
+                    {units.map(unit => <option key={unit} value={unit}>{unit}</option>)}
+                  </select>
                 </div>
-              </form>
-            </>
-          )}
-        </div>
+              )}
+              <div className="flex space-x-3 pt-2">
+                <button type="button" onClick={onClose} 
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400">
+                  Cancel
+                </button>
+                <button type="submit" className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700">
+                  <Plus className="w-4 h-4 inline mr-2" />
+                  <span className="hidden sm:inline">Add Transaction</span>
+                  <span className="sm:hidden">Add</span>
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </div>
-    );
+    </div>
+  );
   };
 
   // Main Dashboard
@@ -836,124 +844,246 @@ export default function NSCInventoryDemo() {
 
   // User Management
   const UserManagement = () => {
-    const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: '', role: 'staff' as 'admin' | 'staff' });
+  const [inviteLoading, setInviteLoading] = useState(false);
 
-    return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button onClick={() => changeView('main')} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-                <ArrowLeft className="w-4 h-4" /><span>Back</span>
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold flex items-center">
-                  <Users className="w-7 h-7 mr-3 text-blue-600" />User Management
-                </h1>
-                <p className="text-gray-600">Manage users and invitations</p>
-              </div>
-            </div>
-            <button onClick={() => setShowInviteModal(true)} className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg">
-              <UserPlus className="w-4 h-4" /><span>Invite User</span>
+  const handleInviteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setInviteLoading(true);
+    
+    setTimeout(() => {
+      alert(`Invitation sent to ${inviteForm.email}! (Demo)`);
+      setInviteForm({ email: '', role: 'staff' });
+      setShowInviteModal(false);
+      setInviteLoading(false);
+    }, 1000);
+  };
+
+  const handleCloseInviteModal = () => {
+    setInviteForm({ email: '', role: 'staff' });
+    setShowInviteModal(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button onClick={() => changeView('main')} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+              <ArrowLeft className="w-4 h-4" /><span>Back</span>
             </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Users', value: users.length, icon: Users, color: 'blue' },
-            { label: 'Admins', value: users.filter(u => u.role === 'admin').length, icon: Shield, color: 'purple' },
-            { label: 'Staff', value: users.filter(u => u.role === 'staff').length, icon: Users, color: 'green' },
-            { label: 'Pending Invites', value: 0, icon: Mail, color: 'yellow' }
-          ].map((stat, i) => (
-            <div key={i} className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center">
-                <div className={`w-10 h-10 bg-${stat.color}-100 rounded-lg flex items-center justify-center`}>
-                  <stat.icon className={`w-5 h-5 text-${stat.color}-600`} />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold">All Users</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium">{user.email.charAt(0).toUpperCase()}</span>
-                        </div>
-                        <p className="ml-4 text-sm font-medium">{user.email}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                      }`}>{user.role}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {showInviteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold">Invite New User</h3>
-                <button onClick={() => setShowInviteModal(false)}><X className="w-5 h-5" /></button>
-              </div>
-              <form className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Email Address</label>
-                  <input type="email" className="w-full px-3 py-2 border rounded-lg" placeholder="user@gmail.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Role</label>
-                  <select className="w-full px-3 py-2 border rounded-lg">
-                    <option value="staff">Staff</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div className="flex space-x-3">
-                  <button type="button" onClick={() => { alert('Invitation sent! (Demo)'); setShowInviteModal(false); }}
-                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg">Send Invitation</button>
-                  <button type="button" onClick={() => setShowInviteModal(false)}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg">Cancel</button>
-                </div>
-              </form>
+            <div>
+              <h1 className="text-2xl font-bold flex items-center">
+                <Users className="w-7 h-7 mr-3 text-blue-600" />User Management
+              </h1>
+              <p className="text-gray-600">Manage users and invitations</p>
             </div>
           </div>
-        )}
+          <button onClick={() => setShowInviteModal(true)} className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+            <UserPlus className="w-4 h-4" /><span>Invite User</span>
+          </button>
+        </div>
       </div>
-    );
+
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Users', value: users.length, icon: Users, color: 'blue' },
+          { label: 'Admins', value: users.filter(u => u.role === 'admin').length, icon: Shield, color: 'purple' },
+          { label: 'Staff', value: users.filter(u => u.role === 'staff').length, icon: Users, color: 'green' },
+          { label: 'Pending Invites', value: 0, icon: Mail, color: 'yellow' }
+        ].map((stat, i) => (
+          <div key={i} className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center">
+              <div className={`w-10 h-10 bg-${stat.color}-100 rounded-lg flex items-center justify-center`}>
+                <stat.icon className={`w-5 h-5 text-${stat.color}-600`} />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">{stat.label}</p>
+                <p className="text-2xl font-bold">{stat.value}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="p-6 border-b">
+          <h2 className="text-lg font-semibold">All Users</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {users.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium">{user.email.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <p className="ml-4 text-sm font-medium">{user.email}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                    }`}>{user.role}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* INVITE USER MODAL - THIS IS THE UPDATED PART */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <Mail className="w-5 h-5 mr-2 text-blue-600" />
+                Invite User
+              </h2>
+              <button onClick={handleCloseInviteModal} className="text-gray-400 hover:text-gray-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleInviteSubmit} className="p-6">
+              <div className="space-y-4">
+                {/* Email Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    value={inviteForm.email}
+                    onChange={(e) => setInviteForm({...inviteForm, email: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="user@example.com"
+                    disabled={inviteLoading}
+                    required
+                  />
+                </div>
+
+                {/* Role Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Role *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Staff Role Card */}
+                    <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${
+                      inviteForm.role === 'staff' 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        value="staff"
+                        checked={inviteForm.role === 'staff'}
+                        onChange={(e) => setInviteForm({...inviteForm, role: e.target.value as 'staff'})}
+                        className="sr-only"
+                        disabled={inviteLoading}
+                      />
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                          <Shield className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Staff</p>
+                          <p className="text-xs text-gray-500">Basic access</p>
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* Admin Role Card */}
+                    <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${
+                      inviteForm.role === 'admin' 
+                        ? 'border-purple-500 bg-purple-50' 
+                        : 'border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        value="admin"
+                        checked={inviteForm.role === 'admin'}
+                        onChange={(e) => setInviteForm({...inviteForm, role: e.target.value as 'admin'})}
+                        className="sr-only"
+                        disabled={inviteLoading}
+                      />
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                          <Shield className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Admin</p>
+                          <p className="text-xs text-gray-500">Full access</p>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCloseInviteModal}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  disabled={inviteLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={inviteLoading}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {inviteLoading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Sending...
+                    </div>
+                  ) : (
+                    'Send Invitation'
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* Info Note Box */}
+            <div className="px-6 pb-6">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> The user will receive an email invitation with instructions to set up their account. 
+                  The invitation will expire in 48 hours.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
   };
 
   // Pending Deletions
