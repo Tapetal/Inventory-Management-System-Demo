@@ -343,6 +343,11 @@ export default function NSCInventoryDemo() {
         .filter(t => t.itemId._id === formData.itemId)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance || 0;
       
+      // Check if withdrawal would result in negative balance
+      if (stockOut > 0 && currentBalance + stockIn < stockOut) {
+        return alert(`Insufficient stock! Current available balance: ${currentBalance + stockIn} units`);
+      }
+      
       const newTransaction: Transaction = {
         _id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
