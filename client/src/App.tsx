@@ -379,10 +379,10 @@ export default function NSCInventoryDemo() {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Transaction Added!</h3>
               <div className="flex space-x-3">
-                <button onClick={() => setShowSuccess(false)} className="flex-1 bg-blue-600 text-white py-2 rounded-lg">
+                <button onClick={() => setShowSuccess(false)} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
                   Add More
                 </button>
-                <button onClick={() => { setShowSuccess(false); onClose(); }} className="flex-1 bg-gray-600 text-white py-2 rounded-lg">
+                <button onClick={() => { setShowSuccess(false); onClose(); }} className="flex-1 bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700">
                   Done
                 </button>
               </div>
