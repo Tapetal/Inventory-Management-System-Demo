@@ -213,7 +213,7 @@ export default function NSCInventoryDemo() {
   };
 
   // Login Component
-  const LoginForm = () => (
+  const LoginForm = React.memo(() => (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-green-800 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         <div className="text-center mb-8">
@@ -275,7 +275,7 @@ export default function NSCInventoryDemo() {
         </div>
       </div>
     </div>
-  );
+  ));
 
   // Header Component
   const Header = () => (
